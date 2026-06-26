@@ -1,0 +1,12 @@
+# Python virtual environment - regenerated from requirements.txt
+.venv/
+
+# Python bytecode caches
+__pycache__/
+*.pyc
+
+# Secrets - API keys live here, NEVER commit this
+.env
+
+# Mac clutter
+.DS_Store
