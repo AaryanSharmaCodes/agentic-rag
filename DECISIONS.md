@@ -59,7 +59,50 @@ Format for each entry: **Decision → Why → Tradeoff → If it changed**
 
 ---
 
+## Day 3 — Embeddings & vector math
+
+- **No Anthropic embeddings API — use Voyage AI (`voyage-3`) for embeddings, Claude for generation**
+  Why: Anthropic does not offer an embeddings endpoint; Voyage is their recommended embeddings partner. Real RAG mixes an embedding model + a chat model — they're different jobs.
+  Tradeoff: one more API key + provider; embeddings happen over the network (latency) vs a local model.
+  If it changed: privacy/offline needs → swap to a local `sentence-transformers` model (only `embeddings.py` changes).
+
+- **Voyage (cloud) over a local embedding model**
+  Why: keeps the deployed app small + low-memory for a free-tier host (Day 10); tiny dependency footprint at runtime; fits the Claude/Anthropic stack story.
+  Tradeoff: local would be free + offline + no rate limits, but pulls in PyTorch (~hundreds of MB) and needs ~1–2GB RAM — tight on free-tier deploy.
+
+- **All embedding access behind one `embed()` function, model name in one constant**
+  Why: the "keep the model swappable" Day 1 decision, made real — the rest of the codebase never imports `voyageai` directly, so swapping providers touches one file.
+
+- **Cosine similarity implemented by hand in pure Python first (`vectors.py`), no numpy**
+  Why: it's the core retrieval primitive and a common interview question — owning the dot-product/magnitude math beats calling a library blind. numpy comes later for speed.
+  Tradeoff: hand-rolled is slower than numpy's vectorized version; fine at this scale.
+
+- **Cosine (angle) over Euclidean (straight-line) distance**
+  Why: we care about *direction* (meaning), not vector *length*. `[1,2,2]` and `[2,4,4]` mean the same thing and score 1.0 — cosine ignores magnitude by design.
+
+- **`input_type="query"` for questions vs `"document"` for stored chunks**
+  Why: Voyage tunes the vector differently so a question and its answering passage land closer together, improving retrieval.
+
+- **Key insight: retrieval needs correct *ranking*, not perfect scores**
+  Unrelated English sentences still scored ~0.56 (not 0) because everything is "a little similar." What matters is that relevant chunks outscore irrelevant ones — the ordering, not the absolute number.
+
+- **Environment lesson (learned the hard way): always confirm `(.venv)` is active before `pip install`**
+  Installed into Anaconda `base` by accident, which also polluted `requirements.txt` with hundreds of packages. Fix: `source .venv/bin/activate`, verify with `which pip` (must point inside the project), reinstall, re-freeze. Clean `requirements.txt` is project-only (~64 lines).
+
+- **Bug caught: `=+` is not `+=`**
+  `dot =+ x*y` parses as `dot = (+x*y)` — a plain assignment keeping only the last value, not an accumulation. Ran with no error but gave wrong answers (0.666 instead of 1.0). Same gotcha exists in C++.
+
+---
+
 ## Open interview questions to answer (write your own answers here)
+
+**Day 3:**
+1. Anthropic has no embeddings API — explain your two-model setup (Voyage for embeddings, Claude for generation) and why that split exists.
+   - *(your answer)*
+2. Walk me through cosine similarity: what does it measure geometrically, and why use the angle instead of straight-line distance?
+   - *(your answer)*
+3. Two unrelated sentences still scored 0.56. Why isn't that a problem for retrieval?
+   - *(your answer)*
 
 **Day 2:**
 1. Walk me through your chunking strategy — how did you pick chunk size and overlap, and what breaks if each is too big or too small?
