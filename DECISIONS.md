@@ -94,7 +94,42 @@ Format for each entry: **Decision → Why → Tradeoff → If it changed**
 
 ---
 
+## Day 4 — Retrieval / semantic search
+
+- **A `VectorStore` class holding two parallel lists (`chunks` + `vectors`), position `i` linking them**
+  Why: retrieval needs the chunk text AND its vector kept together and searchable. Parallel lists indexed by position is the simplest structure that does the job and stays readable for a beginner.
+  Tradeoff: parallel lists can drift out of sync if edited carelessly; a list of objects each holding both would be safer. Fine at this size.
+  If it changed: swap the internals for a real index (FAISS / Chroma / pgvector) without changing the `add`/`search` interface.
+
+- **In-memory, hand-rolled search (loop + cosine over every chunk) — NOT a vector DB yet**
+  Why: it makes the core idea unmissable — retrieval is literally "score every chunk against the question, sort, take the top k," powered by the cosine function we wrote by hand on Day 3. Zero new dependencies.
+  Tradeoff: O(n) per query — compares against every chunk. Unusable at millions of chunks.
+  If it changed: production scale → an Approximate Nearest Neighbour index (FAISS/HNSW) or a hosted vector DB. Same `search()` signature, different guts.
+
+- **`search()` returns top-`k` (default 3), not top-1 and not everything**
+  Why: top-1 is fragile (the single best chunk may hold only part of the answer); returning everything defeats retrieval (we'd dump the whole doc back into the model). A small handful balances recall vs noise.
+  Tradeoff: bigger k = more context/recall but more tokens + more chance of irrelevant chunks diluting the answer.
+
+- **Each chunk stored with an `id` and a `source` label**
+  Why: Day 5 citations need to point back at *which* chunk from *which* document an answer came from. Storing that at index time makes grounding + citations possible later.
+
+- **Sort with `key=lambda pair: pair[0]` (score only), not a bare sort**
+  Why: a plain `sort()` on `(score, chunk_dict)` tuples would, on a score tie, try to compare the two dicts with `<` and crash. Sorting on the score alone never touches the dict.
+
+- **Observation: real-document scores clustered ~0.34–0.37 (low, and close together)**
+  Confirms the Day 3 insight on real data: absolute similarity numbers are low and bunched because all English text is "a little similar." Retrieval quality is about *ordering* (relevant chunks outranking irrelevant ones), not hitting a high score.
+
+---
+
 ## Open interview questions to answer (write your own answers here)
+
+**Day 4:**
+1. Walk me through what happens, step by step, when a user asks a question — from the raw question to the top-k chunks coming back.
+   - *(your answer)*
+2. Your search compares the query against every stored chunk. Why is that a problem at scale, and what would you replace it with?
+   - *(your answer)*
+3. Why embed the question with `input_type="query"` but the chunks with `"document"`? What would break if you used the same type for both?
+   - *(your answer)*
 
 **Day 3:**
 1. Anthropic has no embeddings API — explain your two-model setup (Voyage for embeddings, Claude for generation) and why that split exists.
