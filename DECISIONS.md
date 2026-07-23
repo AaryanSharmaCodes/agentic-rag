@@ -147,7 +147,42 @@ Format for each entry: **Decision → Why → Tradeoff → If it changed**
 
 ---
 
+## Day 6 — Agent / tool-use layer
+
+- **Agent (model controls the flow) vs Day 5 chain (code controls the flow)**
+  Why: this is the defining distinction of the whole project. Day 5 is a fixed pipeline — always retrieve, always answer. The agent gives the model a `search_documents` tool and lets IT decide whether/what/how-many-times to search before answering. Verified live: the agent searched for a document question but answered "Hello!" directly with NO search.
+  Tradeoff: agents are more flexible but less predictable, harder to debug, and cost more (extra model round-trips per tool call).
+  If it changed: for a strictly fixed task, the Day 5 chain is cheaper and more predictable — don't reach for an agent when a chain suffices.
+
+- **Manual agent loop with a `max_steps` safety cap**
+  Why: the loop is send → model answers OR requests a tool → run tool, feed result back → repeat. The cap guarantees a confused model that keeps calling tools can't loop forever (bounded cost + latency).
+  Tradeoff: a too-low cap could cut off a genuinely multi-step task; too high wastes tokens on a stuck model.
+  If it changed: SDKs offer a built-in "tool runner" that hides the loop — we wrote it by hand on purpose, to own the mechanism.
+
+- **The tool is a DESCRIPTION we give the model; WE execute it ("model proposes, code disposes")**
+  Why: the model can't run code — it can only emit a structured request to call `search_documents(query=...)`. Our code runs the real retrieval and hands text back. That's the security boundary of tool use: nothing runs unless our code chooses to run it.
+  Interview angle: this is why tool use is safe to expose — you gate every action.
+
+- **Stateless API → resend the full message history every step**
+  Why: the model has no memory between calls. The `messages` list (system, user, assistant tool-requests, tool results) IS the memory — we grow it each step and resend it, so the model "sees" what it already searched.
+
+- **`tool_choice="auto"` + quality tool `description` fields**
+  Why: "auto" is what hands the decision to the model. The tool's `name`/`description` act as a mini-prompt — better descriptions → better decisions about when to call it.
+
+- **`role="tool"` + `tool_call_id` link each result to its request**
+  Why: the model can request several tools at once; the `tool_call_id` is how the API matches each returned result to the exact call that asked for it.
+
+---
+
 ## Open interview questions to answer (write your own answers here)
+
+**Day 6:**
+1. What's the difference between a RAG "chain" and an "agent"? Frame it as "who controls the flow."
+2. Walk me through your agent loop step by step. Each turn, what are the only two things the model can return?
+3. Your agent answered "Hello!" without searching but searched for a document question. What made that possible, and why is it a good thing?
+4. When the model "calls" the search tool — does it execute code? Explain the security boundary.
+5. Why do you resend the entire message history on every step of the loop? Where does the agent's "memory" actually live?
+6. Why did you add a max_steps cap? What goes wrong without it?
 
 **Day 5:**
 1. Your system prompt has three rules (use-only-context, cite, say-I-don't-know). Which one actually reduces hallucination, and why that one?
