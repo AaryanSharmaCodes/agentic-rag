@@ -121,7 +121,43 @@ Format for each entry: **Decision → Why → Tradeoff → If it changed**
 
 ---
 
+## Day 5 — Answer generation with citations
+
+- **Switched generation provider Claude → Groq (Llama 3.3 70B) mid-project**
+  Why: could not pay for the Anthropic API; Groq is free with no credit card and runs a strong open-weight model. The Day 1 "keep the model swappable" decision made this a ONE-FILE change (`generate.py` only) — retrieval/embedding/ingestion untouched. This is the project's headline "provider-independence" story.
+  Tradeoff: Llama 70B is slightly less capable than Opus 4.8 on hard reasoning; also a second vendor/rate-limit to reason about. Embeddings stayed on Voyage.
+  If it changed: pay for Claude later → swap `Groq()` back to `anthropic.Anthropic()` and adjust the message shape (~10 lines).
+
+- **Grounding via a strict system prompt: "use ONLY the numbered context, cite it, say 'I don't know' otherwise"**
+  Why: this instruction is what turns "a chatbot" into RAG. Constraining the model to the retrieved passages is THE mechanism that reduces hallucination; the "I don't know" clause stops it inventing answers when retrieval finds nothing relevant.
+  Tradeoff: an over-strict prompt can make the model refuse to answer things that ARE implied by the context. Prompt wording is a real lever.
+
+- **Numbered context `[1] … [2] …` with a display number separate from the chunk's internal `id`**
+  Why: the model cites human-friendly "passage 1/2", while we keep our own stable `id`/`source` mapping so a UI (Day 8) can turn `[1]` into a real citation back to the document. Citations = traceability = trust.
+
+- **OpenAI-style chat API (system prompt as the first `messages` entry) vs Anthropic (separate `system=` arg)**
+  Why worth noting: same concept, different plumbing. Groq/OpenAI put system as `messages[0]` with role "system" and return text at `choices[0].message.content`; Anthropic takes `system=` top-level and returns a list of content blocks. Knowing both shapes is useful.
+
+- **`temperature=0` for generation**
+  Why: RAG answers should be faithful to the source, not creative. Temperature 0 makes the model as deterministic/grounded as possible — we don't want stylistic variance, we want it to stick to the passages.
+  Tradeoff: 0 is repetitive/less fluent; fine (desirable) here, wrong for creative writing.
+
+- **`max_tokens=1024`**
+  Why: a grounded answer over a few passages is short; 1024 is ample headroom. Bump only if an answer ever truncates mid-sentence.
+
+---
+
 ## Open interview questions to answer (write your own answers here)
+
+**Day 5:**
+1. Your system prompt has three rules (use-only-context, cite, say-I-don't-know). Which one actually reduces hallucination, and why that one?
+   - *(your answer)*
+2. How do citations work end to end — how does the model "know" a passage is number [1], and how would you turn that back into a clickable source?
+   - *(your answer)*
+3. You set temperature=0. What does temperature do, and why is 0 the right call for RAG specifically?
+   - *(your answer)*
+4. You swapped Claude for Llama/Groq in one file. What made that possible, and what did NOT have to change?
+   - *(your answer)*
 
 **Day 4:**
 1. Walk me through what happens, step by step, when a user asks a question — from the raw question to the top-k chunks coming back.
